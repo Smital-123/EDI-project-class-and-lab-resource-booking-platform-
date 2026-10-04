@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — Lab &amp; Classroom Booking Portal</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/t3-styles.css">
+</head>
+<body>
+<div class="login-page">
+    <div class="login-left">
+        <img src="https://images.unsplash.com/photo-1562774053-701939374585?q=80&w=1200&auto=format&fit=crop" alt="Campus">
+        <h1>Lab &amp; Classroom Booking Portal</h1>
+        <p>Smartly book laboratories and classrooms with ease.</p>
+    </div>
+
+    <div class="login-right">
+        <div class="login-box card">
+            <h2>Welcome Back!</h2>
+            <p style="margin-bottom:20px;color:#6b7280;">Sign in with your credentials to continue</p>
+
+            <div id="login-error" class="t3-error" style="display:none;"></div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" placeholder="Enter your email" autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter your password" autocomplete="current-password">
+            </div>
+
+            <button type="button" class="btn" id="login-btn" style="width:100%;">
+                Login
+            </button>
+
+            <div id="login-loading" style="display:none;text-align:center;margin-top:14px;">
+                <span class="t3-stat-loading" style="display:inline-block;width:120px;"></span>
+            </div>
+
+            <div style="margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;">
+                <p style="font-size:13px;color:#6b7280;margin-bottom:8px;">Test Accounts (Click to auto-fill):</p>
+                <table style="font-size:12px;width:100%;border-collapse:collapse;">
+                    <tr style="background:#f8fafc;">
+                        <th style="padding:6px 8px;text-align:left;border:1px solid #e5e7eb;">Role</th>
+                        <th style="padding:6px 8px;text-align:left;border:1px solid #e5e7eb;">Email</th>
+                        <th style="padding:6px 8px;text-align:left;border:1px solid #e5e7eb;">Password</th>
+                    </tr>
+                    <tr style="cursor:pointer;" onclick="fillCreds('anjali.deshmukh@college.edu', 'Test@12345')">
+                        <td style="padding:6px 8px;border:1px solid #e5e7eb;">Faculty</td>
+                        <td style="padding:6px 8px;border:1px solid #e5e7eb;color:#2563eb;">anjali.deshmukh@college.edu</td>
+                        <td style="padding:6px 8px;border:1px solid #e5e7eb;color:#6b7280;">Test@12345</td>
+                    </tr>
+                    <tr style="cursor:pointer;" onclick="fillCreds('amit.patil@college.edu', 'Test@12345')">
+                        <td style="padding:6px 8px;border:1px solid #e5e7eb;">Lab Assistant</td>
+                        <td style="padding:6px 8px;border:1px solid #e5e7eb;color:#2563eb;">amit.patil@college.edu</td>
+                        <td style="padding:6px 8px;border:1px solid #e5e7eb;color:#6b7280;">Test@12345</td>
+                    </tr>
+                    <tr style="cursor:pointer;" onclick="fillCreds('admin@college.edu', 'Test@12345')">
+                        <td style="padding:6px 8px;border:1px solid #e5e7eb;">Admin</td>
+                        <td style="padding:6px 8px;border:1px solid #e5e7eb;color:#2563eb;">admin@college.edu</td>
+                        <td style="padding:6px 8px;border:1px solid #e5e7eb;color:#6b7280;">Test@12345</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function fillCreds(email, password) {
+    document.getElementById('email').value = email;
+    document.getElementById('password').value = password;
+    document.getElementById('login-btn').focus();
+}
+</script>
+<script type="module">
+import { supabase } from './assets/js/supabase-client.js';
+import { login, syncUserProfile, ROLE_DASHBOARDS } from './assets/js/auth.js';
+
+// Warn user if opened via file:// protocol
+const errEl = document.getElementById('login-error');
+if (window.location.protocol === 'file:') {
+    errEl.innerHTML = '<strong>⚠️ Opened via file:// protocol:</strong><br>Web browsers block authentication requests when opening local files directly.<br><br>Please open the portal through the local web server: <a href="http://localhost:8000/login.html" style="color:#2563eb;text-decoration:underline;font-weight:bold;">http://localhost:8000/login.html</a>';
+    errEl.style.display = 'block';
+}
+
+// Show unlinked message if redirected with ?error=unlinked
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('error') === 'unlinked') {
+    errEl.textContent = 'Your account is authenticated, but no application profile is linked. Please contact the administrator.';
+    errEl.style.display = 'block';
+}
+
+// Expose and bind doLogin immediately so form is never unresponsive
+async function doLogin() {
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const loadEl   = document.getElementById('login-loading');
+    const btn      = document.getElementById('login-btn');
+
+    errEl.style.display = 'none';
+
+    if (!email) {
+        errEl.textContent   = 'Please enter your email address.';
+        errEl.style.display = 'block';
+        return;
+    }
+    if (!password) {
+        errEl.textContent   = 'Please enter your password.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    btn.disabled         = true;
+    loadEl.style.display = 'block';
+
+    try {
+        const result = await login(email, password);
+
+        loadEl.style.display = 'none';
+        btn.disabled         = false;
+
+        if (!result.success) {
+            errEl.textContent   = result.message;
+            errEl.style.display = 'block';
+            return;
+        }
+
+        const target = ROLE_DASHBOARDS[result.session.role] || 'login.html';
+        window.location.replace(target);
+    } catch (err) {
+        console.error('Login error:', err);
+        loadEl.style.display = 'none';
+        btn.disabled         = false;
+        errEl.textContent   = err.message || 'Login failed. Please verify credentials.';
+        errEl.style.display = 'block';
+    }
+}
+window.doLogin = doLogin;
+
+document.getElementById('login-btn').addEventListener('click', doLogin);
+document.getElementById('password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+});
+document.getElementById('email').addEventListener('keydown', e => {
+    if (e.key === 'Enter') doLogin();
+});
+
+// If already logged in with a valid session, redirect to role dashboard
+(async function checkExistingSession() {
+    try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.user) {
+            const profile = await syncUserProfile(sessionData.session.user);
+            if (profile?.role && ROLE_DASHBOARDS[profile.role]) {
+                window.location.replace(ROLE_DASHBOARDS[profile.role]);
+            }
+        }
+    } catch (e) {
+        console.warn('[Login] Session check exception:', e);
+    }
+})();
+</script>
+</body>
+</html>
